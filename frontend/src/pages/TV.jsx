@@ -81,6 +81,8 @@ function TVPage() {
     };
 
     load();
+    // Polling ringan untuk mencegah blank (sinkron konten)
+    const iv = setInterval(load, 5000);
     return () => { cancelled = true; };
   }, [id]);
 
