@@ -10,6 +10,9 @@ function App() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isRunning, setIsRunning] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
+  const [previewVideoAudio, setPreviewVideoAudio] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('previewVideoAudio') || 'false'); } catch { return false; }
+  });
 
   // Multi-display (beberapa tampilan)
   const [displays, setDisplays] = useState(() => {
@@ -100,6 +103,9 @@ function App() {
   useEffect(() => {
     try { localStorage.setItem("selectedDisplayId", selectedDisplayId); } catch {}
   }, [selectedDisplayId]);
+  useEffect(() => {
+    try { localStorage.setItem('previewVideoAudio', JSON.stringify(previewVideoAudio)); } catch {}
+  }, [previewVideoAudio]);
 
   // Muat konten & darkMode saat ganti display
   useEffect(() => {
@@ -152,6 +158,8 @@ function App() {
                 setDisplays={setDisplays}
                 selectedDisplayId={selectedDisplayId}
                 setSelectedDisplayId={setSelectedDisplayId}
+                previewVideoAudio={previewVideoAudio}
+                setPreviewVideoAudio={setPreviewVideoAudio}
               />
 
               {/* Display Screen */}
@@ -162,6 +170,7 @@ function App() {
                   selectedDisplayId={selectedDisplayId}
                   setSelectedDisplayId={setSelectedDisplayId}
                   darkMode={darkMode}
+                  previewVideoAudio={previewVideoAudio}
                 />
               </div>
             </div>

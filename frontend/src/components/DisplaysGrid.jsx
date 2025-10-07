@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 
-function MiniPreview({ displayId, darkMode, onClick, isActive }) {
+function MiniPreview({ displayId, darkMode, onClick, isActive, previewVideoAudio }) {
   const [content, setContent] = useState(null);
 
   useEffect(() => {
@@ -36,7 +36,15 @@ function MiniPreview({ displayId, darkMode, onClick, isActive }) {
           <img src={content.src} alt="preview" className="w-full h-full object-contain" />
         )}
         {content && content.type === "video" && (
-          <video src={content.src} className="w-full h-full object-contain" muted />
+          <video
+            src={content.src}
+            className="w-full h-full object-contain"
+            autoPlay
+            loop
+            playsInline
+            controls
+            muted={!previewVideoAudio}
+          />
         )}
         {content && content.type === "text" && (
           <div
@@ -56,7 +64,7 @@ function MiniPreview({ displayId, darkMode, onClick, isActive }) {
   );
 }
 
-const DisplaysGrid = ({ displays, selectedDisplayId, setSelectedDisplayId, darkMode }) => {
+const DisplaysGrid = ({ displays, selectedDisplayId, setSelectedDisplayId, darkMode, previewVideoAudio }) => {
   return (
     <div className="w-full p-3">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3">
@@ -67,6 +75,7 @@ const DisplaysGrid = ({ displays, selectedDisplayId, setSelectedDisplayId, darkM
             darkMode={darkMode}
             isActive={selectedDisplayId === d.id}
             onClick={() => setSelectedDisplayId(d.id)}
+            previewVideoAudio={previewVideoAudio}
           />
         ))}
       </div>

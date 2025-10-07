@@ -3,6 +3,9 @@ import { motion } from "framer-motion";
 import ColorPicker from "./ColorPicker";
 import NeoButton from "./NeoButton";
 import ToggleSwitch from "./ToggleSwitch";
+import PlaylistManager from "./PlaylistManager";
+import AssignPlaylists from "./AssignPlaylists";
+import ScheduleManager from "./ScheduleManager";
 
 const ControlPanel = ({
   isRunning,
@@ -19,6 +22,8 @@ const ControlPanel = ({
   setDisplays,
   selectedDisplayId,
   setSelectedDisplayId,
+  previewVideoAudio,
+  setPreviewVideoAudio,
 }) => {
   const [text, setText] = useState("");
   const [textSize, setTextSize] = useState("3xl");
@@ -29,6 +34,9 @@ const ControlPanel = ({
   const [speed, setSpeed] = useState(5);
 
   const [mediaFile, setMediaFile] = useState(null);
+  const [uploadToServer, setUploadToServer] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('uploadToServer') || 'false'); } catch { return false; }
+  });
   const [overlayText, setOverlayText] = useState("");
   const [overlaySize, setOverlaySize] = useState("md");
   const [overlayColor, setOverlayColor] = useState("");
@@ -52,30 +60,57 @@ const ControlPanel = ({
     setText("");
   };
 
-  const handleAddMedia = () => {
+  const handleAddMedia = async () => {
     if (!mediaFile) return;
     const type = mediaFile.type.includes("video") ? "video" : "image";
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const dataUrl = ev.target.result;
-      addContent({
-        type,
-        src: dataUrl, // simpan sebagai Data URL agar bisa dipakai di tab fullscreen
-        name: mediaFile.name || "media",
-        overlayText: overlayText || "",
-        overlaySize,
-        overlayColor,
-        overlayBg,
-        duration,
-        tickerText: tickerText || "",
-        tickerSpeed,
-        tickerMarquee,
-      });
-      setMediaFile(null);
-      setOverlayText("");
-      setTickerText("");
-    };
-    reader.readAsDataURL(mediaFile);
+    if (uploadToServer) {
+      try {
+        const form = new FormData();
+        form.append('file', mediaFile);
+        form.append('title', mediaFile.name || 'media');
+        const resp = await fetch('/api/upload', { method: 'POST', body: form });
+        if (!resp.ok) throw new Error('Upload gagal');
+        const data = await resp.json();
+        addContent({
+          type,
+          src: data.url || data.path,
+          name: data.title || mediaFile.name,
+          overlayText: overlayText || "",
+          overlaySize,
+          overlayColor,
+          overlayBg,
+          duration,
+          tickerText: tickerText || "",
+          tickerSpeed,
+          tickerMarquee,
+        });
+      } catch (e) {
+        alert('Upload gagal, menggunakan penyimpanan lokal.');
+        setUploadToServer(false);
+      }
+    } else {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const dataUrl = ev.target.result;
+        addContent({
+          type,
+          src: dataUrl, // simpan sebagai Data URL agar bisa dipakai di tab fullscreen
+          name: mediaFile.name || "media",
+          overlayText: overlayText || "",
+          overlaySize,
+          overlayColor,
+          overlayBg,
+          duration,
+          tickerText: tickerText || "",
+          tickerSpeed,
+          tickerMarquee,
+        });
+      };
+      reader.readAsDataURL(mediaFile);
+    }
+    setMediaFile(null);
+    setOverlayText("");
+    setTickerText("");
   };
 
   const handleDelete = (index) => {
@@ -121,15 +156,42 @@ const ControlPanel = ({
             <option key={d.id} value={d.id}>{d.name} ({d.id})</option>
           ))}
         </select>
-        <div className="flex gap-2">
-          <a
-            href={`/display/${selectedDisplayId}`}
-            target="_blank"
-            rel="noreferrer"
-            className="flex-1 inline-block px-3 py-2 rounded bg-gradient-to-r from-sky-500 to-blue-600 text-white text-sm text-center shadow hover:from-sky-600 hover:to-blue-700 transition"
-          >
-            Buka Display (Fullscreen)
-          </a>
+        <div className="flex flex-col gap-2">
+          <div className="text-xs opacity-80">Link TV (salin dan buka di TV)</div>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              readOnly
+              value={`${(typeof window !== 'undefined' ? (localStorage.getItem('tvBase') || window.location.origin) : '')}/tv/${encodeURIComponent(selectedDisplayId)}`}
+              className={`flex-1 p-2 rounded border text-xs ${darkMode ? 'bg-gray-700 text-gray-100' : 'bg-white text-gray-800'}`}
+              onFocus={(e) => e.target.select()}
+            />
+            <button
+              onClick={() => {
+                const base = localStorage.getItem('tvBase') || window.location.origin;
+                const link = `${base}/tv/${encodeURIComponent(selectedDisplayId)}`;
+                navigator.clipboard?.writeText(link);
+              }}
+              className="px-3 py-2 rounded bg-gradient-to-r from-emerald-500 to-green-600 text-white text-sm shadow hover:from-emerald-600 hover:to-green-700 transition"
+            >
+              Copy
+            </button>
+          </div>
+          <div className="flex gap-2 items-center">
+            <input
+              type="text"
+              placeholder="TV Link Base (mis: http://localhost:3001)"
+              defaultValue={typeof window !== 'undefined' ? (localStorage.getItem('tvBase') || window.location.origin) : ''}
+              onBlur={(e) => {
+                try { localStorage.setItem('tvBase', e.target.value || window.location.origin); } catch {}
+              }}
+              className={`flex-1 p-2 rounded border text-xs ${darkMode ? 'bg-gray-700 text-gray-100' : 'bg-white text-gray-800'}`}
+            />
+            <label className="text-xs flex items-center gap-2">
+              <input type="checkbox" checked={previewVideoAudio} onChange={(e) => setPreviewVideoAudio(e.target.checked)} />
+              Audio Preview Video
+            </label>
+          </div>
           <button
             onClick={() => {
               if (displays.length <= 1) return alert("Minimal 1 display");
@@ -141,7 +203,7 @@ const ControlPanel = ({
             }}
             className="px-3 py-2 rounded bg-gradient-to-r from-rose-500 to-red-600 text-white text-sm shadow hover:from-rose-600 hover:to-red-700 transition"
           >
-            Hapus
+            Hapus Display
           </button>
         </div>
       </div>
@@ -233,6 +295,17 @@ const ControlPanel = ({
       {/* Media Content */}
       <div className="mb-6 border-b pb-4">
         <h3 className="font-semibold mb-2">Add Media (Image/Video)</h3>
+        <label className="flex items-center gap-2 mb-2 text-sm">
+          <input
+            type="checkbox"
+            checked={uploadToServer}
+            onChange={(e) => {
+              setUploadToServer(e.target.checked);
+              try { localStorage.setItem('uploadToServer', JSON.stringify(e.target.checked)); } catch {}
+            }}
+          />
+          Upload ke Server (pakai URL publik)
+        </label>
         <input
           type="file"
           accept="image/*,video/*"
@@ -304,22 +377,17 @@ const ControlPanel = ({
 
       {/* Playlist */}
       <div className="mb-6">
-        <h3 className="font-semibold mb-2">Playlist</h3>
-        <div className="space-y-2 max-h-60 overflow-y-auto">
-          {contents.map((c, idx) => (
-            <div
-              key={idx}
-              className="flex justify-between items-center p-1 border rounded"
-            >
-              <span className="truncate">
-                {c.type === "text" ? c.text : (c.name || "media")}
-              </span>
-              <div className="w-28">
-                <NeoButton color="red" onClick={() => handleDelete(idx)}>Delete</NeoButton>
-              </div>
-            </div>
-          ))}
-        </div>
+        <PlaylistManager darkMode={darkMode} />
+      </div>
+
+      {/* Assign Playlists ke Display */}
+      <div className="mb-6">
+        <AssignPlaylists selectedDisplayId={selectedDisplayId} darkMode={darkMode} />
+      </div>
+
+      {/* Schedule Manager */}
+      <div className="mb-6">
+        <ScheduleManager selectedDisplayId={selectedDisplayId} darkMode={darkMode} />
       </div>
 
       {/* Export / Import / Reset */}

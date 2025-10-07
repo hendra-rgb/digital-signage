@@ -16,8 +16,17 @@ class DisplayController extends Controller
             ->get();
     }
 
-    public function show(Display $display)
+    public function showByKey(string $displayKey)
     {
+        // Cari berdasarkan id numerik atau nama persis (case-insensitive)
+        $q = Display::query();
+        if (ctype_digit($displayKey)) {
+            $q->where('id', (int) $displayKey);
+        } else {
+            $q->whereRaw('LOWER(name) = ?', [mb_strtolower(urldecode($displayKey))]);
+        }
+
+        $display = $q->firstOrFail();
         $display->load(['playlists' => function ($q) {
             $q->where('is_active', true);
         }]);

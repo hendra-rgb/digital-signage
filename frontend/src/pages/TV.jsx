@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
-import DisplayScreen from "../components/DisplayScreen";
 import { useParams } from "react-router-dom";
+import DisplayScreen from "../components/DisplayScreen";
 
-function DisplayPage() {
+function TVPage() {
   const { id } = useParams();
   const [contents, setContents] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -10,21 +10,28 @@ function DisplayPage() {
   const [darkMode, setDarkMode] = useState(false);
   const containerRef = useRef(null);
 
+  // Minta fullscreen saat mount (akan gagal di beberapa browser tanpa gesture)
+  useEffect(() => {
+    const el = containerRef.current || document.documentElement;
+    if (el && el.requestFullscreen) {
+      el.requestFullscreen().catch(() => {});
+    }
+  }, []);
+
+  // Muat playlist dari API (berdasarkan id atau nama), fallback ke localStorage
   useEffect(() => {
     let cancelled = false;
     const displayKeyRaw = id || localStorage.getItem('selectedDisplayId') || 'default';
-    // Jika numeric id tersedia, gunakan angka untuk endpoint Laravel binding implicit
     const numericId = /^\d+$/.test(String(displayKeyRaw)) ? String(displayKeyRaw) : null;
     const displayKey = numericId || displayKeyRaw;
 
     const load = async () => {
-      // 1) Coba ambil dari API
+      // 1) API
       try {
-    const resp = await fetch(`/api/displays/${encodeURIComponent(displayKey)}/playlist`);
+        const resp = await fetch(`/api/displays/${encodeURIComponent(displayKey)}/playlist`);
         if (resp.ok) {
           const data = await resp.json();
           const items = Array.isArray(data.items) ? data.items : [];
-          // Map ke struktur frontend
           const mapped = items.map((it) => {
             const c = it.content || {};
             if (c.type === 'image' || c.type === 'video') {
@@ -41,7 +48,6 @@ function DisplayPage() {
                 tickerMarquee: c.metadata?.tickerMarquee ?? true,
               };
             }
-            // text/html/url -> tampilkan sebagai text (jika metadata ada)
             return {
               type: 'text',
               text: c.metadata?.text || c.title || '',
@@ -60,7 +66,7 @@ function DisplayPage() {
         }
       } catch {}
 
-      // 2) Fallback ke localStorage
+      // 2) Fallback localStorage
       try {
         const saved = JSON.parse(localStorage.getItem(`playlist:${displayKey}`) || "[]");
         const savedDark = JSON.parse(localStorage.getItem(`darkMode:${displayKey}`) || "false");
@@ -78,6 +84,7 @@ function DisplayPage() {
     return () => { cancelled = true; };
   }, [id]);
 
+  // Auto-advance
   useEffect(() => {
     const current = contents[currentIndex];
     if (!isRunning || !current) return;
@@ -88,41 +95,15 @@ function DisplayPage() {
     return () => clearTimeout(t);
   }, [contents, currentIndex, isRunning]);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      try {
-        const saved = JSON.parse(localStorage.getItem(`playlist:${id || localStorage.getItem('selectedDisplayId') || 'default'}`) || "[]");
-        const savedDark = JSON.parse(localStorage.getItem(`darkMode:${id || localStorage.getItem('selectedDisplayId') || 'default'}`) || "false");
-        setContents(Array.isArray(saved) ? saved : []);
-        setDarkMode(!!savedDark);
-        if (currentIndex >= (saved?.length || 0)) setCurrentIndex(0);
-      } catch {}
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [currentIndex]);
-
-  const enterFullscreen = () => {
-    const el = containerRef.current || document.documentElement;
-    if (el.requestFullscreen) el.requestFullscreen();
-    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
-    else if (el.msRequestFullscreen) el.msRequestFullscreen();
-  };
-
   const current = contents[currentIndex] || null;
 
   return (
     <div ref={containerRef} className={`w-screen h-screen ${darkMode ? "bg-black" : "bg-gray-100"} relative`}>
-      <button
-        onClick={enterFullscreen}
-        className="absolute top-3 right-3 z-30 px-3 py-1 rounded bg-blue-600 text-white opacity-80 hover:opacity-100"
-      >
-        Fullscreen
-      </button>
       <DisplayScreen currentContent={current} isRunning={isRunning} darkMode={darkMode} />
     </div>
   );
 }
 
-export default DisplayPage;
+export default TVPage;
 
 

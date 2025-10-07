@@ -8,8 +8,16 @@ use App\Models\Display;
 class PlaylistController extends Controller
 {
     // Ambil playlist aktif untuk sebuah display (dengan items dan content)
-    public function byDisplay(Display $display)
+    public function byDisplayKey(string $displayKey)
     {
+        $q = Display::query();
+        if (ctype_digit($displayKey)) {
+            $q->where('id', (int) $displayKey);
+        } else {
+            $q->whereRaw('LOWER(name) = ?', [mb_strtolower(urldecode($displayKey))]);
+        }
+        $display = $q->firstOrFail();
+
         $display->load(['playlists' => function ($q) {
             $q->where('is_active', true)
               ->with(['items.content']);
